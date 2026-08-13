@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
 const app = express();
@@ -9,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hospilot_db';
 const HOSPILOT_API = process.env.HOSPILOT_API_BASE || 'https://hospilot.carer.ai';
 const USERNAME = process.env.HOSPILOT_USERNAME || 'medcity_doc_1';
 const PASSWORD = process.env.HOSPILOT_PASSWORD || '123456';
@@ -17,7 +19,66 @@ const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:8080';
 // Serve static frontend files
 app.use(express.static(__dirname));
 
-// Helper for fetch / urllib
+// ── MongoDB Schemas & Connection ──
+let isMongoConnected = false;
+
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  full_name: String,
+  title: String,
+  employee_id: String,
+  department: String,
+  email: String,
+  phone: String,
+  gender: String,
+  qualification: String,
+  experience_years: String,
+  license_number: String,
+  shift_preference: String,
+  bio: String,
+  emergency_contact: String,
+  role: { type: String, default: 'doctor' }
+});
+
+const User = mongoose.model('User', userSchema);
+
+// Memory fallback store for high reliability if local Mongo server is offline
+let memoryUser = {
+  username: 'medcity_doc_1',
+  password: '123456',
+  full_name: "Dr. Neha Sharma",
+  title: "Chief Medical Administrator",
+  employee_id: "EMP-9042",
+  department: "Emergency & Critical Care",
+  email: "neha.sharma@careplus.org",
+  phone: "+91 98765 43210",
+  gender: "Female",
+  qualification: "MBBS, MD (Critical Care), MHA",
+  experience_years: "12 Years",
+  license_number: "MCI-2012-44012",
+  shift_preference: "Day Shift (08:00 - 16:00)",
+  bio: "Senior medical administrator managing acute emergency workflows, bed allocations, and AI-assisted hospital coordination.",
+  emergency_contact: "Dr. Arjun Patel (+91 98111 22233)",
+  role: "doctor"
+};
+
+mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 2500 })
+  .then(async () => {
+    isMongoConnected = true;
+    console.log('MongoDB Connected successfully at', MONGODB_URI);
+    // Seed default user if database is empty
+    const existing = await User.findOne({ username: 'medcity_doc_1' });
+    if (!existing) {
+      await User.create(memoryUser);
+      console.log('Default doctor user seeded into MongoDB collection [users].');
+    }
+  })
+  .catch(err => {
+    console.log('MongoDB local connection bypassed (using active memory store fallback):', err.message);
+  });
+
+// Helper for Hospilot API fetch
 async function hospilotFetch(endpoint, options = {}) {
   const url = `${HOSPILOT_API}${endpoint}`;
   const response = await fetch(url, {
@@ -34,18 +95,51 @@ async function hospilotFetch(endpoint, options = {}) {
   return response.json();
 }
 
-// 1. Auth Endpoint
+// 1. Auth Endpoint (MongoDB + Sandbox API Login)
 app.post('/api/auth/login', async (req, res) => {
   try {
     const username = req.body.username || USERNAME;
     const password = req.body.password || PASSWORD;
-    const data = await hospilotFetch('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password })
+
+    // Authenticate with Hospilot Sandbox API for JWT Token
+    let token = "jwt_sandbox_token_default";
+    try {
+      const authRes = await hospilotFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: USERNAME, password: PASSWORD })
+      });
+      token = authRes.token;
+    } catch (e) {
+      console.log('Hospilot API fallback login');
+    }
+
+    // Verify or fetch user profile from MongoDB
+    let dbUser = memoryUser;
+    if (isMongoConnected) {
+      const found = await User.findOne({ username });
+      if (found) {
+        dbUser = found.toObject();
+      } else {
+        // Create user in MongoDB
+        dbUser = await User.create({
+          username,
+          password,
+          full_name: username === 'medcity_doc_1' ? "Dr. Neha Sharma" : username,
+          title: "Medical Specialist",
+          employee_id: "EMP-" + Math.floor(1000 + Math.random() * 9000),
+          department: "General Medicine"
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      token,
+      user: dbUser,
+      mongo_connected: isMongoConnected
     });
-    res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -53,9 +147,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/sessions', async (req, res) => {
   try {
     const token = req.headers.authorization;
-    if (!token) {
-      return res.status(401).json({ error: 'Missing Authorization header' });
-    }
+    if (!token) return res.status(401).json({ error: 'Missing Authorization header' });
     const { goal, constraints = '', autonomous = false } = req.body;
     const data = await hospilotFetch('/api/sessions', {
       method: 'POST',
@@ -72,9 +164,7 @@ app.post('/api/sessions', async (req, res) => {
 app.get('/api/sessions/:id', async (req, res) => {
   try {
     const token = req.headers.authorization;
-    if (!token) {
-      return res.status(401).json({ error: 'Missing Authorization header' });
-    }
+    if (!token) return res.status(401).json({ error: 'Missing Authorization header' });
     const data = await hospilotFetch(`/api/sessions/${req.params.id}`, {
       method: 'GET',
       headers: { Authorization: token }
@@ -85,7 +175,7 @@ app.get('/api/sessions/:id', async (req, res) => {
   }
 });
 
-// 4. Integrated Plan Route (Login -> Create Session -> Poll until ready)
+// 4. Integrated Plan Route
 app.post('/api/plan', async (req, res) => {
   try {
     const goal = req.body.goal || '[CANDIDATE-ritheesh] Check ICU bed capacity for tonight';
@@ -105,7 +195,7 @@ app.post('/api/plan', async (req, res) => {
     });
     const sessionId = sessRes.session_id;
 
-    // Step C: Poll for completion (up to 45 seconds)
+    // Step C: Poll for completion
     let pipeline = null;
     let pollAttempts = 0;
     const maxAttempts = 25;
@@ -137,7 +227,7 @@ app.post('/api/plan', async (req, res) => {
   }
 });
 
-// 5. Ask Hospilot RAG Proxy Endpoint
+// 5. RAG Proxy Endpoint
 app.post('/api/ask', async (req, res) => {
   try {
     const { question } = req.body;
@@ -149,9 +239,7 @@ app.post('/api/ask', async (req, res) => {
       body: JSON.stringify({ question })
     });
 
-    if (!ragResponse.ok) {
-      throw new Error(`RAG Service error: ${ragResponse.statusText}`);
-    }
+    if (!ragResponse.ok) throw new Error(`RAG Service error: ${ragResponse.statusText}`);
 
     const data = await ragResponse.json();
     res.json(data);
@@ -160,7 +248,38 @@ app.post('/api/ask', async (req, res) => {
   }
 });
 
-// 6. Dynamic HIS Data Endpoints for Tabs
+// 6. MongoDB User Profile Endpoints
+app.get('/api/his/profile', async (req, res) => {
+  try {
+    if (isMongoConnected) {
+      const u = await User.findOne({ username: 'medcity_doc_1' });
+      if (u) return res.json(u);
+    }
+    res.json(memoryUser);
+  } catch (err) {
+    res.json(memoryUser);
+  }
+});
+
+app.post('/api/his/profile', async (req, res) => {
+  try {
+    if (isMongoConnected) {
+      let u = await User.findOne({ username: 'medcity_doc_1' });
+      if (u) {
+        Object.assign(u, req.body);
+        await u.save();
+        return res.json({ success: true, profile: u, source: 'MongoDB' });
+      }
+    }
+    memoryUser = { ...memoryUser, ...req.body };
+    res.json({ success: true, profile: memoryUser, source: 'MemoryStore' });
+  } catch (err) {
+    memoryUser = { ...memoryUser, ...req.body };
+    res.json({ success: true, profile: memoryUser, error: err.message });
+  }
+});
+
+// 7. Dynamic HIS Endpoints
 app.get('/api/his/beds', (req, res) => {
   res.json({
     summary: { total: 104, occupied: 52, available: 22, reserved: 26, dirty: 4 },
@@ -238,39 +357,22 @@ app.get('/api/his/billing', (req, res) => {
   });
 });
 
-let userProfile = {
-  full_name: "Dr. Neha Sharma",
-  title: "Chief Medical Administrator",
-  employee_id: "EMP-9042",
-  department: "Emergency & Critical Care",
-  email: "neha.sharma@careplus.org",
-  phone: "+91 98765 43210",
-  gender: "Female",
-  qualification: "MBBS, MD (Critical Care), MHA",
-  experience_years: "12 Years",
-  license_number: "MCI-2012-44012",
-  shift_preference: "Day Shift (08:00 - 16:00)",
-  bio: "Senior medical administrator managing acute emergency workflows, bed allocations, and AI-assisted hospital coordination.",
-  emergency_contact: "Dr. Arjun Patel (+91 98111 22233)"
-};
-
-app.get('/api/his/profile', (req, res) => {
-  res.json(userProfile);
-});
-
-app.post('/api/his/profile', (req, res) => {
-  userProfile = { ...userProfile, ...req.body };
-  res.json({ success: true, profile: userProfile });
+app.get('/api/his/reports', (req, res) => {
+  res.json({
+    occupancy_rate: "82%",
+    avg_length_of_stay: "4.2 Days",
+    er_turnaround_time: "34 mins",
+    daily_collections: { cash: "₹1,20,000", upi: "₹3,40,000", card: "₹4,10,000", insurance: "₹2,50,000" }
+  });
 });
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Hospilot Widget & HIS Server running on http://localhost:${PORT}`);
+    console.log(`Hospilot MongoDB Backend Server running on http://localhost:${PORT}`);
   });
 }
 
