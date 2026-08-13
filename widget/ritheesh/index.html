@@ -295,7 +295,7 @@
       });
 
       // Hospilot Planner State
-      const [goal, setGoal] = useState('[CANDIDATE-ritheesh] Check ICU bed capacity for tonight');
+      const [goal, setGoal] = useState('[CANDIDATE-yuvan sai] Check ICU bed capacity for tonight');
       const [isPlanning, setIsPlanning] = useState(false);
       const [planResult, setPlanResult] = useState(null);
       const [iframeOpen, setIframeOpen] = useState(false);
@@ -777,9 +777,9 @@
                       onChange={(e) => setGoal(e.target.value)}
                     />
                     <div className="chips-group" style={{ marginTop: '10px' }}>
-                      <div className="chip-item" onClick={() => setGoal('[CANDIDATE-ritheesh] Check ICU bed capacity for tonight')}>Check ICU Capacity</div>
-                      <div className="chip-item" onClick={() => setGoal('[CANDIDATE-ritheesh] ER Evening Surge Staffing Plan')}>ER Surge Staffing</div>
-                      <div className="chip-item" onClick={() => setGoal('[CANDIDATE-ritheesh] Review OR Scheduling Bottlenecks')}>OR Bottlenecks</div>
+                      <div className="chip-item" onClick={() => setGoal('[CANDIDATE-yuvan sai] Check ICU bed capacity for tonight')}>Check ICU Capacity</div>
+                      <div className="chip-item" onClick={() => setGoal('[CANDIDATE-yuvan sai] ER Evening Surge Staffing Plan')}>ER Surge Staffing</div>
+                      <div className="chip-item" onClick={() => setGoal('[CANDIDATE-yuvan sai] Review OR Scheduling Bottlenecks')}>OR Bottlenecks</div>
                     </div>
                   </div>
 
@@ -934,10 +934,18 @@
                   src="https://hospilot.carer.ai"
                   onLoad={(e) => {
                     setHandshakeStatus('Posting widget_init handshake...');
-                    e.target.contentWindow.postMessage(
-                      { type: 'widget_init', token: planResult.token, sessionId: planResult.sessionId },
-                      '*'
-                    );
+                    const frameWindow = e.target.contentWindow;
+                    // Send immediately and also retry a few times to ensure the React app in the iframe is mounted
+                    const sendHandshake = () => {
+                      frameWindow.postMessage(
+                        { type: 'widget_init', token: planResult.token, sessionId: planResult.sessionId },
+                        '*'
+                      );
+                    };
+                    sendHandshake();
+                    setTimeout(sendHandshake, 500);
+                    setTimeout(sendHandshake, 1000);
+                    setTimeout(sendHandshake, 2000);
                     setTimeout(() => setHandshakeStatus('⚡ Widget Handshake Sent'), 800);
                   }}
                 />

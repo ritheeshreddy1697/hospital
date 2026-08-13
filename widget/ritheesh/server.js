@@ -233,7 +233,7 @@ app.get('/api/sessions/:id', async (req, res) => {
 // 4. Integrated Plan Route (Fixed Pipeline Extraction for Object & Array structures)
 app.post('/api/plan', async (req, res) => {
   try {
-    const goal = req.body.goal || '[CANDIDATE-ritheesh] Check ICU bed capacity for tonight';
+    const goal = req.body.goal || '[CANDIDATE-yuvan sai] Check ICU bed capacity for tonight';
 
     // Step A: Login
     const authRes = await hospilotFetch('/api/auth/login', {
@@ -335,7 +335,7 @@ app.post('/api/ask', async (req, res) => {
 
     // Universal dynamic schema-grounded RAG fallback engine with unique answer synthesizer
     const q = question.toLowerCase();
-    const anyWord = (str, words) => words.some(w => str.includes(w));
+    const anyWord = (str, words) => words.some(w => new RegExp('\\b' + w + '\\b', 'i').test(str));
     let answer = "";
     let sql = "";
 

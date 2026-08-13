@@ -70,7 +70,7 @@ class HospilotRAGEngine:
         q = query_text.lower()
 
         # 1. Greetings & Conversational Queries
-        if any(w in q for w in ["hi", "hello", "hey", "who are you", "what can you do", "help"]):
+        if any(re.search(r'\b' + re.escape(w) + r'\b', q) for w in ["hi", "hello", "hey", "who", "help"]):
             sql = "SELECT 'Hospilot AI v2.0' AS system, 'Active & Operational' AS status"
             answer = "Hello! 👋 I am **Hospilot AI**, your 24/7 smart hospital assistant. Ask me any general question, medical advice, doctor availability, bed counts, ER triage, lab results, pharmacy stock, or billing status!"
             return sql, answer
@@ -157,12 +157,81 @@ class HospilotRAGEngine:
             return sql, None
 
         # 10. Universal Custom NLP Synthesizer for ANY General Question
-        keywords = [w for w in re.findall(r'\w+', q) if len(w) > 3 and w not in ["what", "how", "where", "which", "who", "when", "does", "this", "that", "there", "about", "have", "with"]]
-        topic_name = " ".join(keywords[:3]).title() if keywords else "Hospital Operations"
+        sql = f"SELECT 'LLM Inference' AS domain_query, 'Generative AI' AS mode"
+        llm_answer = self._call_llm(query_text)
+        return sql, llm_answer
+
+    def _get_hospital_context(self):
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT ward, status, COUNT(*) as count FROM beds WHERE is_active = 1 GROUP BY ward, status")
+            beds_rows = cursor.fetchall()
+            
+            cursor.execute("SELECT status, COUNT(*) as count FROM ipd_admissions GROUP BY status")
+            ipd_rows = cursor.fetchall()
+            
+            conn.close()
+            
+            context = "Current Hospital Data Context:\nBeds by Ward:\n"
+            for row in beds_rows:
+                context += f"- {row[0]} ({row[1]}): {row[2]} beds\n"
+            
+            context += "\nIPD Admissions Status:\n"
+            for row in ipd_rows:
+                context += f"- {row[0]}: {row[2] if len(row)>2 else row[1]} patients\n"
+                
+            return context
+        except Exception as e:
+            return "Hospital database context currently offline."
+
+    def _call_llm(self, query_text):
+        if not self.api_key:
+            return f"I am Hospilot AI. I am unable to connect to my AI brain (Missing API Key) to answer: {query_text}"
         
-        sql = f"SELECT '{topic_name}' AS domain_query, 'Live HIS Record Scan' AS mode"
-        answer = f"🔍 **Analysis for '{query_text}'**:\n\nRegarding **{topic_name}**: The Hospital Information System reports that all related clinical units (ICU, ER Triage, OPD Clinics, Diagnostic Labs, and Pharmacy Inventory) are functioning smoothly with 22 available beds and 82% active occupancy."
-        return sql, answer
+        import urllib.request
+        import ssl
+        import json
+        
+        # Use Gemini API if it looks like a Gemini key (starts with AIza) or just default to Gemini since user requested it
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.api_key}"
+        headers = {
+            "Content-Type": "application/json"
+        }
+        
+        hospital_context = self._get_hospital_context()
+        
+        system_prompt = (
+            "You are Hospilot AI, an intelligent operations assistant for CarePlus Hospital.\n"
+            f"Here is the real-time hospital operational data:\n{hospital_context}\n\n"
+            "CRITICAL INSTRUCTION: You MUST ONLY answer questions related to the hospital's operational data provided above. "
+            "You are providing insights that are there in the website. "
+            "If the user asks a general question (e.g. general medical advice, world facts, random questions), "
+            "you MUST politely refuse to answer and state that you can only provide insights about the hospital's operations."
+        )
+        data = {
+            "system_instruction": {
+                "parts": [{"text": system_prompt}]
+            },
+            "contents": [
+                {
+                    "parts": [{"text": query_text}]
+                }
+            ]
+        }
+        
+        try:
+            req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers, method='POST')
+            context = ssl._create_unverified_context()
+            with urllib.request.urlopen(req, context=context) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                return result['candidates'][0]['content']['parts'][0]['text']
+        except Exception as e:
+            # Fallback to simulated dynamic response if API key is invalid or fails
+            keywords = [w for w in re.findall(r'\w+', query_text) if len(w) > 3]
+            topic = " ".join(keywords[:3]).title() if keywords else "General Inquiry"
+            return f"I am Hospilot AI. Regarding '{topic}', I'm currently operating in offline mode (API Error: {str(e)}), but I'm here to help with hospital operations, beds, and doctor schedules!"
 
     def _synthesize_answer(self, query_text, sql, rows, columns):
         q = query_text.lower()
@@ -230,6 +299,7 @@ class HospilotRAGEngine:
                 formatted_items.append(f"- {item_str}")
             return f"Regarding your question **'{query_text}'**, here is the live operational data from the Hospital Information System:\n\n" + "\n".join(formatted_items)
 
-        return f"Regarding your question **'{query_text}'**: Live hospital operations report 82% overall capacity with 22 available beds, 4 active IPD critical care patients, and all diagnostic/emergency units fully operational."
+        # Fallback to LLM if no rows
+        return self._call_llm(query_text)
 
 
