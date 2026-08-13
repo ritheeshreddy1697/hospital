@@ -850,19 +850,29 @@
                   )}
 
                   {ragResult && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
                       {ragResult.reasoning_sql && (
                         <div>
-                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Transparent Reasoning (Generated SQL)</div>
-                          <div className="sql-code-box">{ragResult.reasoning_sql}</div>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Transparent Reasoning (Generated SQL)</div>
+                          <div className="sql-code-box" style={{ background: '#0f172a', color: '#38bdf8', padding: '12px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px' }}>
+                            {ragResult.reasoning_sql}
+                          </div>
                         </div>
                       )}
                       <div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Answer</div>
-                        <div className={ragResult.is_answerable ? 'rag-answer-box' : 'rag-refusal-box'}>
-                          {ragResult.answer}
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Hospilot Answer</div>
+                        <div className={ragResult.is_answerable !== false ? 'rag-answer-box' : 'rag-refusal-box'} style={{ padding: '14px 16px', borderRadius: '10px', fontSize: '14px', lineHeight: '1.6', background: ragResult.is_answerable !== false ? '#ecfdf5' : '#fef2f2', border: ragResult.is_answerable !== false ? '1px solid #a7f3d0' : '1px solid #fecaca', color: ragResult.is_answerable !== false ? '#065f46' : '#991b1b', fontWeight: 600 }}>
+                          {ragResult.answer || ragResult.error || ragResult.detail || ragResult.message || 'No response generated.'}
                         </div>
                       </div>
+                      {ragResult.rows_retrieved && ragResult.rows_retrieved.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Retrieved Data Records ({ragResult.rows_retrieved.length})</div>
+                          <pre style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', color: '#334155', overflowX: 'auto' }}>
+                            {JSON.stringify(ragResult.rows_retrieved, null, 2)}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   )}
                 </React.Fragment>
