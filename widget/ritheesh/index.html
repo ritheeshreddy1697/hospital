@@ -301,10 +301,52 @@
       const [iframeOpen, setIframeOpen] = useState(false);
       const [handshakeStatus, setHandshakeStatus] = useState('');
 
-      // Hospilot RAG State
-      const [ragQuestion, setRagQuestion] = useState('How many ICU beds are available right now?');
+      // Hospilot General Chatbot State
+      const [ragQuestion, setRagQuestion] = useState('');
       const [isRagLoading, setIsRagLoading] = useState(false);
-      const [ragResult, setRagResult] = useState(null);
+      const [chatMessages, setChatMessages] = useState([
+        {
+          id: 1,
+          sender: 'ai',
+          text: 'Hello! 👋 I am Hospilot AI, your 24/7 intelligent clinical & hospital operations assistant. Ask me any general question about health, medical guidance, ICU beds, doctor slots, emergency triage, lab diagnostics, or billing!',
+          sql: 'SELECT system_status FROM hospilot_core'
+        }
+      ]);
+
+      const handleAskRag = async (overrideQuestion) => {
+        const q = (typeof overrideQuestion === 'string' ? overrideQuestion : ragQuestion).trim();
+        if (!q) return alert('Please enter a question or select a suggested topic.');
+
+        const userMsg = { id: Date.now(), sender: 'user', text: q };
+        setChatMessages(prev => [...prev, userMsg]);
+        if (typeof overrideQuestion !== 'string') setRagQuestion('');
+        setIsRagLoading(true);
+
+        try {
+          const res = await fetch('/api/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: q })
+          });
+          const data = await res.json();
+          const aiMsg = {
+            id: Date.now() + 1,
+            sender: 'ai',
+            text: data.answer || data.error || 'I processed your query.',
+            sql: data.reasoning_sql,
+            rows: data.rows_retrieved
+          };
+          setChatMessages(prev => [...prev, aiMsg]);
+          setIsRagLoading(false);
+        } catch (err) {
+          setChatMessages(prev => [...prev, {
+            id: Date.now() + 1,
+            sender: 'ai',
+            text: 'Apologies, network issue: ' + err.message
+          }]);
+          setIsRagLoading(false);
+        }
+      };
 
       // Data states for views
       const [viewData, setViewData] = useState(null);
@@ -409,27 +451,6 @@
         } catch (err) {
           alert('Planning error: ' + err.message);
           setIsPlanning(false);
-        }
-      };
-
-      // Handle RAG Ask Submission
-      const handleAskRag = async () => {
-        if (!ragQuestion.trim()) return alert('Please enter a question');
-        setIsRagLoading(true);
-        setRagResult(null);
-
-        try {
-          const res = await fetch('/api/ask', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: ragQuestion })
-          });
-          const data = await res.json();
-          setRagResult(data);
-          setIsRagLoading(false);
-        } catch (err) {
-          alert('RAG Query error: ' + err.message);
-          setIsRagLoading(false);
         }
       };
 
@@ -816,65 +837,77 @@
                 </React.Fragment>
               ) : (
                 <React.Fragment>
+                  {/* Suggested Important Questions */}
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Natural Language Question</label>
-                    <textarea
-                      className="textarea-box"
-                      style={{ height: '95px' }}
-                      value={ragQuestion}
-                      onChange={(e) => setRagQuestion(e.target.value)}
-                    />
-                    <div className="chips-group" style={{ marginTop: '10px' }}>
-                      <div className="chip-item" onClick={() => setRagQuestion('How many ICU beds are available right now?')}>Free ICU Beds</div>
-                      <div className="chip-item" onClick={() => setRagQuestion('Which wards have the highest bed occupancy right now?')}>Occupancy Ranking</div>
-                      <div className="chip-item" onClick={() => setRagQuestion('how are beds doing?')}>Broad Bed Status</div>
-                      <div className="chip-item" onClick={() => setRagQuestion('What is our average patient satisfaction rating this month?')}>Test Refusal Guard</div>
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
+                      💡 Suggested Important Questions
+                    </div>
+                    <div className="chips-group" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                      <div className="chip-item" onClick={() => handleAskRag('What are the first aid steps for high fever?')}>🌡️ High Fever Care</div>
+                      <div className="chip-item" onClick={() => handleAskRag('How many ICU beds are available right now?')}>🛏️ Free ICU Beds</div>
+                      <div className="chip-item" onClick={() => handleAskRag('Which doctors are available for OPD consultation today?')}>👨‍⚕️ Doctor OPD Slots</div>
+                      <div className="chip-item" onClick={() => handleAskRag('What is the current Emergency Room (ER) wait time?')}>🚨 ER Wait Times</div>
+                      <div className="chip-item" onClick={() => handleAskRag('Which medications are low in pharmacy stock?')}>💊 Low Medicine Stock</div>
+                      <div className="chip-item" onClick={() => handleAskRag('What is our daily hospital billing and insurance clearance status?')}>💰 Billing & TPA Claims</div>
+                      <div className="chip-item" onClick={() => handleAskRag('Give me a full summary of today hospital operations')}>🏥 Hospital Summary</div>
                     </div>
                   </div>
 
-                  <button
-                    className="btn-action btn-primary"
-                    style={{ padding: '14px', fontSize: '14px' }}
-                    onClick={handleAskRag}
-                    disabled={isRagLoading}
-                  >
-                    {isRagLoading ? 'Querying RAG Engine...' : '🔍 Ask Hospilot RAG'}
-                  </button>
-
-                  {isRagLoading && (
-                    <div className="status-card">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700 }}>
-                        <span className="spinner"></span> Querying Hospilot Knowledge Base...
-                      </div>
-                    </div>
-                  )}
-
-                  {ragResult && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
-                      {ragResult.reasoning_sql && (
-                        <div>
-                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Transparent Reasoning (Generated SQL)</div>
-                          <div className="sql-code-box" style={{ background: '#0f172a', color: '#38bdf8', padding: '12px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px' }}>
-                            {ragResult.reasoning_sql}
-                          </div>
+                  {/* General Chat Feed Container */}
+                  <div style={{ flex: 1, minHeight: '340px', maxHeight: '520px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px', background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #cbd5e1', marginTop: '12px' }}>
+                    {chatMessages.map((msg) => (
+                      <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '3px' }}>
+                          {msg.sender === 'user' ? '👤 You' : '🤖 Hospilot AI'}
                         </div>
-                      )}
-                      <div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Hospilot Answer</div>
-                        <div className={ragResult.is_answerable !== false ? 'rag-answer-box' : 'rag-refusal-box'} style={{ padding: '14px 16px', borderRadius: '10px', fontSize: '14px', lineHeight: '1.6', background: ragResult.is_answerable !== false ? '#ecfdf5' : '#fef2f2', border: ragResult.is_answerable !== false ? '1px solid #a7f3d0' : '1px solid #fecaca', color: ragResult.is_answerable !== false ? '#065f46' : '#991b1b', fontWeight: 600 }}>
-                          {ragResult.answer || ragResult.error || ragResult.detail || ragResult.message || 'No response generated.'}
+                        <div style={{
+                          maxWidth: '88%',
+                          padding: '12px 16px',
+                          borderRadius: msg.sender === 'user' ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                          background: msg.sender === 'user' ? '#2563eb' : '#ffffff',
+                          color: msg.sender === 'user' ? '#ffffff' : '#0f172a',
+                          border: msg.sender === 'user' ? 'none' : '1px solid #e2e8f0',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                          fontSize: '13px',
+                          lineHeight: '1.6',
+                          whiteSpace: 'pre-line'
+                        }}>
+                          {msg.text}
+                          {msg.sql && (
+                            <div style={{ marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '6px', fontSize: '11px', color: msg.sender === 'user' ? '#93c5fd' : '#0284c7', fontFamily: 'monospace' }}>
+                              🔍 Reasoning: {msg.sql}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      {ragResult.rows_retrieved && ragResult.rows_retrieved.length > 0 && (
-                        <div>
-                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Retrieved Data Records ({ragResult.rows_retrieved.length})</div>
-                          <pre style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', color: '#334155', overflowX: 'auto' }}>
-                            {JSON.stringify(ragResult.rows_retrieved, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    ))}
+                    {isRagLoading && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#2563eb', fontWeight: 600, padding: '8px' }}>
+                        <span className="spinner"></span> Hospilot AI is thinking & retrieving operational data...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Message Input Box */}
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                    <input
+                      type="text"
+                      className="input-field"
+                      style={{ flex: 1, padding: '12px 14px' }}
+                      placeholder="Ask any general or medical question..."
+                      value={ragQuestion}
+                      onChange={(e) => setRagQuestion(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAskRag(); }}
+                    />
+                    <button
+                      className="btn-action btn-primary"
+                      style={{ padding: '12px 20px', whiteSpace: 'nowrap' }}
+                      onClick={() => handleAskRag()}
+                      disabled={isRagLoading}
+                    >
+                      ✈️ Send
+                    </button>
+                  </div>
                 </React.Fragment>
               )}
             </div>
