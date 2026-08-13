@@ -1,4 +1,4 @@
-﻿"""Maps base agent id -> ported async body. Mirrors the old api.agents._WORKFLOW_MAP.
+"""Maps base agent id -> ported async body. Mirrors the old api.agents._WORKFLOW_MAP.
 
 Agents absent from this map (e.g. infection_control_agent, supply_chain_agent)
 fall through to a completed stub in graph.nodes._dispatch_body. appointment_agent
@@ -11,6 +11,7 @@ from workflows.graph.agents.simple import (
     run_er_body, run_revenue_body,
     run_patient_verification_body,
 )
+from workflows.graph.agents.diagnostic import run_diagnostic_body, bid_diagnostic
 
 AGENT_BODIES = {
     "bed_agent":            run_bed_body,
@@ -19,6 +20,7 @@ AGENT_BODIES = {
     "staff_agent":          run_staff_body,
     "revenue_agent":        run_revenue_body,
     "patient_verification_agent": run_patient_verification_body,
+    "diagnostic_agent":     run_diagnostic_body,
 }
 
 # Optional per-agent bid hooks for the 'bidding' execution strategy
@@ -28,4 +30,6 @@ AGENT_BODIES = {
 # uniform. See graph.nodes._bid_for.
 AGENT_BID_HOOKS = {
     "bed_agent": bid_bed,
+    "diagnostic_agent": bid_diagnostic,
 }
+

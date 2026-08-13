@@ -1,0 +1,22 @@
+{
+  "department_budgets": {
+    "ER": {
+      "base_shift_budget": 1000,
+      "hourly_recovery_rate": 100,
+      "surge_demand_multiplier": 1.5,
+      "min_reserve_threshold": 100
+    },
+    "OT": {
+      "base_shift_budget": 800,
+      "hourly_recovery_rate": 80,
+      "surge_demand_multiplier": 1.2,
+      "min_reserve_threshold": 80
+    },
+    "ICU": {
+      "base_shift_budget": 700,
+      "hourly_recovery_rate": 70,
+      "surge_demand_multiplier": 1.1,
+      "min_reserve_threshold": 70
+    }
+  }
+}

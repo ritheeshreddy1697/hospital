@@ -1,4 +1,4 @@
-﻿"""
+"""
 AGENT_DATA_MANIFEST -- declares what data each agent can access at runtime.
 
 Used by two guardrail checkpoints:
@@ -248,7 +248,22 @@ AGENT_DATA_MANIFEST: dict[str, AgentDataSources] = {
             {"name": "fetch_available_slots", "description": "Get bookable doctor slots (Available, not full) with provider specialty",       "input_schema": {"type": "object", "properties": {}, "required": []}},
         ],
     ),
+
+    "diagnostic_agent": AgentDataSources(
+        redis_keys=["diagnostic:{id}", "slot:{id}"],
+        hasura_tables=["hospilot_lab_orders", "hospilot_lab_results", "hospilot_service_slots"],
+        context_fields=[
+            "_goal",
+            "ta_fetch_diagnostic_slots", "ta_evaluate_diagnostic_bid",
+            "available_slots", "urgency_threshold", "winning_bid",
+        ],
+        description="Diagnostic resource allocation, slot scheduling (MRI, CT SCAN, LAB) and multi-agent auction bidding",
+        tool_schemas=[
+            {"name": "fetch_diagnostic_slots", "description": "Get available MRI, CT SCAN, or LAB slots", "input_schema": {"type": "object", "properties": {}, "required": []}},
+        ],
+    ),
 }
+
 
 
 def get_manifest(agent_id: str) -> AgentDataSources | None:

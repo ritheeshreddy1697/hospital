@@ -1,0 +1,22 @@
+{
+  "diagnostic_resources": {
+    "MRI": {
+      "max_daily_capacity": 12,
+      "urgency_ceiling_cap": 200,
+      "max_single_bid_cap": 150,
+      "min_participation_fee": 2
+    },
+    "CT_SCAN": {
+      "max_daily_capacity": 24,
+      "urgency_ceiling_cap": 160,
+      "max_single_bid_cap": 120,
+      "min_participation_fee": 1
+    },
+    "LAB": {
+      "max_daily_capacity": 100,
+      "urgency_ceiling_cap": 100,
+      "max_single_bid_cap": 75,
+      "min_participation_fee": 0.5
+    }
+  }
+}
