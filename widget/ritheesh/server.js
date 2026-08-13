@@ -138,6 +138,66 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// 1b. Registration / Account Creation Endpoint
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, password, full_name, title, department, email, phone, gender } = req.body;
+    if (!username || !password || !full_name) {
+      return res.status(400).json({ success: false, error: 'Username, Password, and Full Name are required' });
+    }
+
+    let token = "jwt_sandbox_token_default";
+    try {
+      const authRes = await hospilotFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: USERNAME, password: PASSWORD })
+      });
+      token = authRes.token;
+    } catch (e) {
+      console.log('Hospilot API fallback login');
+    }
+
+    let newUser = {
+      username,
+      password,
+      full_name,
+      title: title || 'Medical Specialist',
+      employee_id: 'EMP-' + Math.floor(1000 + Math.random() * 9000),
+      department: department || 'General Medicine',
+      email: email || `${username}@careplus.org`,
+      phone: phone || '+91 98765 00000',
+      gender: gender || 'Female',
+      qualification: 'MBBS, MD',
+      experience_years: '5 Years',
+      license_number: 'MCI-' + Math.floor(10000 + Math.random() * 90000),
+      shift_preference: 'Day Shift (08:00 - 16:00)',
+      bio: `Registered medical practitioner in ${department || 'General Medicine'}.`,
+      emergency_contact: '+91 98000 11122',
+      role: 'doctor'
+    };
+
+    if (isMongoConnected) {
+      const existing = await User.findOne({ username });
+      if (existing) {
+        return res.status(400).json({ success: false, error: 'Username already exists in MongoDB' });
+      }
+      const created = await User.create(newUser);
+      newUser = created.toObject();
+    } else {
+      memoryUser = newUser;
+    }
+
+    res.json({
+      success: true,
+      token,
+      user: newUser,
+      mongo_connected: isMongoConnected
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 2. Create Session Endpoint
 app.post('/api/sessions', async (req, res) => {
   try {

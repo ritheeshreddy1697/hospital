@@ -420,57 +420,197 @@
         setHandshakeStatus('Waiting for iframe to load...');
       };
 
-      // ── IF NOT LOGGED IN: RENDER LOGIN PAGE ──
+      const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+      const [regForm, setRegForm] = useState({
+        username: '', password: '', full_name: '', title: 'Consultant Physician',
+        department: 'Emergency & Critical Care', email: '', phone: ''
+      });
+
+      const handleRegister = async (e) => {
+        if (e) e.preventDefault();
+        if (!regForm.username || !regForm.password || !regForm.full_name) {
+          return alert('Please fill in Username, Password, and Full Name.');
+        }
+        setLoginLoading(true);
+
+        try {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(regForm)
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || 'Registration failed');
+
+          setUserProfile(data.user);
+          setIsLoggedIn(true);
+          setLoginLoading(false);
+          alert(`Account successfully created in MongoDB for ${data.user.full_name}!`);
+        } catch (err) {
+          alert('Registration Error: ' + err.message);
+          setLoginLoading(false);
+        }
+      };
+
+      // ── IF NOT LOGGED IN: RENDER LOGIN / REGISTER PORTAL ──
       if (!isLoggedIn) {
         return (
           <div className="login-container">
-            <div className="login-box">
+            <div className="login-box" style={{ width: authMode === 'register' ? '500px' : '440px' }}>
               <div className="login-header">
                 <div className="login-logo">+</div>
-                <div className="login-title">CarePlus HIS Portal</div>
-                <div className="login-sub">Hospital Authentication & MongoDB Credentials</div>
+                <div className="login-title">{authMode === 'login' ? 'CarePlus HIS Portal' : 'Create Practitioner Account'}</div>
+                <div className="login-sub">{authMode === 'login' ? 'Sign in with your MongoDB practitioner credentials' : 'Register a new medical practitioner in MongoDB'}</div>
               </div>
 
-              <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Username / ID</label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={loginUser}
-                    onChange={(e) => setLoginUser(e.target.value)}
-                    required
-                  />
+              <div className="mode-tabs" style={{ borderRadius: '8px' }}>
+                <div
+                  className={`mode-tab ${authMode === 'login' ? 'active' : ''}`}
+                  onClick={() => setAuthMode('login')}
+                >
+                  🔐 Sign In
                 </div>
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Password</label>
-                  <input
-                    type="password"
-                    className="input-field"
-                    value={loginPass}
-                    onChange={(e) => setLoginPass(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <button type="submit" className="btn-login" disabled={loginLoading}>
-                  {loginLoading ? <span className="spinner"></span> : '🔐 Sign In to Hospital Portal'}
-                </button>
-              </form>
-
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Preset Quick Login Credentials</div>
-                <div className="quick-chips">
-                  <div className="quick-chip" onClick={() => { setLoginUser('medcity_doc_1'); setLoginPass('123456'); handleLogin('medcity_doc_1', '123456'); }}>
-                    <span>🩺 Dr. Neha Sharma (medcity_doc_1)</span>
-                    <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>Doctor / Admin</span>
-                  </div>
-                  <div className="quick-chip" onClick={() => { setLoginUser('doctor_admin'); setLoginPass('123456'); handleLogin('doctor_admin', '123456'); }}>
-                    <span>👨‍⚕️ Admin Specialist (doctor_admin)</span>
-                    <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>Staff</span>
-                  </div>
+                <div
+                  className={`mode-tab ${authMode === 'register' ? 'active' : ''}`}
+                  onClick={() => setAuthMode('register')}
+                >
+                  ➕ Create Account
                 </div>
               </div>
+
+              {authMode === 'login' ? (
+                <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Username / ID</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={loginUser}
+                      onChange={(e) => setLoginUser(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Password</label>
+                    <input
+                      type="password"
+                      className="input-field"
+                      value={loginPass}
+                      onChange={(e) => setLoginPass(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button type="submit" className="btn-login" disabled={loginLoading}>
+                    {loginLoading ? <span className="spinner"></span> : '🔐 Sign In to Hospital Portal'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Username *</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="e.g. dr_rajesh"
+                        value={regForm.username}
+                        onChange={(e) => setRegForm({ ...regForm, username: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Password *</label>
+                      <input
+                        type="password"
+                        className="input-field"
+                        placeholder="••••••••"
+                        value={regForm.password}
+                        onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Full Name *</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="e.g. Dr. Rajesh Varma, MD"
+                      value={regForm.full_name}
+                      onChange={(e) => setRegForm({ ...regForm, full_name: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Job Title</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="e.g. Senior Surgeon"
+                        value={regForm.title}
+                        onChange={(e) => setRegForm({ ...regForm, title: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Department</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="e.g. Cardiology"
+                        value={regForm.department}
+                        onChange={(e) => setRegForm({ ...regForm, department: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Email Address</label>
+                      <input
+                        type="email"
+                        className="input-field"
+                        placeholder="doctor@careplus.org"
+                        value={regForm.email}
+                        onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Phone Number</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="+91 98765 12345"
+                        value={regForm.phone}
+                        onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn-login" style={{ background: '#10b981' }} disabled={loginLoading}>
+                    {loginLoading ? <span className="spinner"></span> : '💾 Register Account & Login'}
+                  </button>
+                </form>
+              )}
+
+              {authMode === 'login' && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>Preset Quick Login Credentials</div>
+                  <div className="quick-chips">
+                    <div className="quick-chip" onClick={() => { setLoginUser('medcity_doc_1'); setLoginPass('123456'); handleLogin('medcity_doc_1', '123456'); }}>
+                      <span>🩺 Dr. Neha Sharma (medcity_doc_1)</span>
+                      <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>Doctor / Admin</span>
+                    </div>
+                    <div className="quick-chip" onClick={() => { setLoginUser('doctor_admin'); setLoginPass('123456'); handleLogin('doctor_admin', '123456'); }}>
+                      <span>👨‍⚕️ Admin Specialist (doctor_admin)</span>
+                      <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>Staff</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
