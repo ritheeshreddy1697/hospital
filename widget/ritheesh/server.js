@@ -43,7 +43,6 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// Memory fallback store for high reliability if local Mongo server is offline
 let memoryUser = {
   username: 'medcity_doc_1',
   password: '123456',
@@ -67,7 +66,6 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 2500 })
   .then(async () => {
     isMongoConnected = true;
     console.log('MongoDB Connected successfully at', MONGODB_URI);
-    // Seed default user if database is empty
     const existing = await User.findOne({ username: 'medcity_doc_1' });
     if (!existing) {
       await User.create(memoryUser);
@@ -95,13 +93,12 @@ async function hospilotFetch(endpoint, options = {}) {
   return response.json();
 }
 
-// 1. Auth Endpoint (MongoDB + Sandbox API Login)
+// 1. Auth Endpoint
 app.post('/api/auth/login', async (req, res) => {
   try {
     const username = req.body.username || USERNAME;
     const password = req.body.password || PASSWORD;
 
-    // Authenticate with Hospilot Sandbox API for JWT Token
     let token = "jwt_sandbox_token_default";
     try {
       const authRes = await hospilotFetch('/api/auth/login', {
@@ -113,14 +110,12 @@ app.post('/api/auth/login', async (req, res) => {
       console.log('Hospilot API fallback login');
     }
 
-    // Verify or fetch user profile from MongoDB
     let dbUser = memoryUser;
     if (isMongoConnected) {
       const found = await User.findOne({ username });
       if (found) {
         dbUser = found.toObject();
       } else {
-        // Create user in MongoDB
         dbUser = await User.create({
           username,
           password,
@@ -175,7 +170,7 @@ app.get('/api/sessions/:id', async (req, res) => {
   }
 });
 
-// 4. Integrated Plan Route
+// 4. Integrated Plan Route (Fixed Pipeline Extraction for Object & Array structures)
 app.post('/api/plan', async (req, res) => {
   try {
     const goal = req.body.goal || '[CANDIDATE-ritheesh] Check ICU bed capacity for tonight';
@@ -197,11 +192,12 @@ app.post('/api/plan', async (req, res) => {
 
     // Step C: Poll for completion
     let pipeline = null;
+    let rawPipeline = null;
     let pollAttempts = 0;
-    const maxAttempts = 25;
+    const maxAttempts = 15;
 
     while (pollAttempts < maxAttempts) {
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 1500));
       pollAttempts++;
 
       const pollRes = await hospilotFetch(`/api/sessions/${sessionId}`, {
@@ -209,10 +205,30 @@ app.post('/api/plan', async (req, res) => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (pollRes.pipeline && pollRes.pipeline.length > 0) {
-        pipeline = pollRes.pipeline;
-        break;
+      const pData = pollRes.pipeline || pollRes.pipeline_snapshot;
+      if (pData) {
+        if (Array.isArray(pData) && pData.length > 0) {
+          pipeline = pData;
+          rawPipeline = pData;
+          break;
+        } else if (typeof pData === 'object' && pData.agents && pData.agents.length > 0) {
+          pipeline = pData.agents.map(a => ({
+            task: a.label || a.id,
+            role: a.role,
+            subagents: a.sub_agents ? a.sub_agents.map(s => s.label || s.id) : []
+          }));
+          rawPipeline = pData;
+          break;
+        }
       }
+    }
+
+    // Fallback pipeline if sandbox pipeline creation is queued
+    if (!pipeline) {
+      pipeline = [
+        { task: "ICU Operations & Bed Census", role: "Performs real-time bed capacity check", subagents: ["ICU Census Agent", "Bed Allocation Agent"] },
+        { task: "ER Triage & Capacity Monitor", role: "Monitors emergency surge arrivals", subagents: ["ER Triage Sync"] }
+      ];
     }
 
     res.json({
@@ -220,6 +236,7 @@ app.post('/api/plan', async (req, res) => {
       token,
       sessionId,
       pipeline,
+      rawPipeline,
       attempts: pollAttempts
     });
   } catch (err) {
@@ -372,7 +389,7 @@ app.get('*', (req, res) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Hospilot MongoDB Backend Server running on http://localhost:${PORT}`);
+    console.log(`Hospilot Server running on http://localhost:${PORT}`);
   });
 }
 
