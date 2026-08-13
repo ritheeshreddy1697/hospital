@@ -997,17 +997,20 @@
 
       const q = searchQuery.toLowerCase();
       const filterRows = (rows, keys) => {
-        if (!q || !rows) return rows || [];
-        return rows.filter(r => keys.some(k => String(r[k] || '').toLowerCase().includes(q)));
+        const list = Array.isArray(rows) ? rows : [];
+        if (!q) return list;
+        return list.filter(r => keys.some(k => String(r[k] || '').toLowerCase().includes(q)));
       };
 
       if (tab === 'dashboard') {
+        const summaryObj = (data && data.summary) || { total: 104, occupied: 52, available: 22, reserved: 26, dirty: 4 };
+        const wardsList = (data && Array.isArray(data.wards)) ? data.wards : [];
         return (
           <React.Fragment>
             <div className="stats-row">
               <div className="stat-card"><div className="stat-label">Today's Admissions</div><div className="stat-value">76</div><div className="stat-delta delta-up">↑ 12% vs yesterday</div></div>
               <div className="stat-card"><div className="stat-label">Bed Occupancy</div><div className="stat-value">82%</div><div className="stat-delta delta-up">↑ 5% vs yesterday</div></div>
-              <div className="stat-card"><div className="stat-label">Total Active Beds</div><div className="stat-value">{data.summary.total}</div><div className="stat-delta" style={{ color: '#64748b' }}>{data.summary.occupied} Occupied · {data.summary.available} Vacant</div></div>
+              <div className="stat-card"><div className="stat-label">Total Active Beds</div><div className="stat-value">{summaryObj.total}</div><div className="stat-delta" style={{ color: '#64748b' }}>{summaryObj.occupied} Occupied · {summaryObj.available} Vacant</div></div>
               <div className="stat-card"><div className="stat-label">Avg ER Wait Time</div><div className="stat-value">34m</div><div className="stat-delta delta-down">↑ 8m vs target</div></div>
             </div>
 
@@ -1021,7 +1024,7 @@
                   <table>
                     <thead><tr><th>Ward</th><th>Available</th><th>Occupied</th><th>Reserved</th><th>Dirty</th></tr></thead>
                     <tbody>
-                      {filterRows(data.wards, ['name']).map((w, idx) => (
+                      {filterRows(wardsList, ['name']).map((w, idx) => (
                         <tr key={idx} onClick={() => onSelectWard(w.name)} style={{ cursor: 'pointer' }} title="Click to view detailed bed occupation, patient vitals & visitor passes">
                           <td style={{ fontWeight: 700, color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>{w.name}</span>
@@ -1058,7 +1061,8 @@
       }
 
       if (tab === 'ipd') {
-        const rows = filterRows(data, ['name', 'uhid', 'doctor', 'ward']);
+        const list = Array.isArray(data) ? data : [];
+        const rows = filterRows(list, ['name', 'uhid', 'doctor', 'ward']);
         return (
           <div className="card">
             <div className="card-header"><div className="card-title">Active IPD Admissions ({rows.length})</div></div>
@@ -1085,6 +1089,8 @@
       }
 
       if (tab === 'opd') {
+        const slotsList = data && Array.isArray(data.slots) ? data.slots : [];
+        const waitlistList = data && Array.isArray(data.waitlist) ? data.waitlist : [];
         return (
           <div className="grid-2">
             <div className="card">
@@ -1093,7 +1099,7 @@
                 <table>
                   <thead><tr><th>Doctor</th><th>Specialization</th><th>Timing</th><th>Booked / Max</th></tr></thead>
                   <tbody>
-                    {filterRows(data.slots, ['doctor', 'spec']).map((s, idx) => (
+                    {filterRows(slotsList, ['doctor', 'spec']).map((s, idx) => (
                       <tr key={idx}>
                         <td style={{ fontWeight: 600 }}>{s.doctor}</td>
                         <td>{s.spec}</td>
@@ -1111,7 +1117,7 @@
                 <table>
                   <thead><tr><th>Patient</th><th>Specialization</th><th>Priority</th><th>Reason</th></tr></thead>
                   <tbody>
-                    {filterRows(data.waitlist, ['name', 'spec']).map((w, idx) => (
+                    {filterRows(waitlistList, ['name', 'spec']).map((w, idx) => (
                       <tr key={idx}>
                         <td style={{ fontWeight: 600 }}>{w.name}</td>
                         <td>{w.spec}</td>
@@ -1128,6 +1134,7 @@
       }
 
       if (tab === 'er') {
+        const list = Array.isArray(data) ? data : [];
         return (
           <div className="card">
             <div className="card-header"><div className="card-title">Emergency Room Triage Queue</div></div>
@@ -1135,7 +1142,7 @@
               <table>
                 <thead><tr><th>Triage ID</th><th>Patient / Age</th><th>Chief Complaint</th><th>Triage Score</th><th>Wait Time</th><th>Status</th></tr></thead>
                 <tbody>
-                  {filterRows(data, ['name', 'complaint']).map((e, idx) => (
+                  {filterRows(list, ['name', 'complaint']).map((e, idx) => (
                     <tr key={idx}>
                       <td style={{ fontWeight: 700 }}>{e.id}</td>
                       <td style={{ fontWeight: 600 }}>{e.name} ({e.age}y)</td>
@@ -1153,6 +1160,7 @@
       }
 
       if (tab === 'beds') {
+        const wardsList = data && Array.isArray(data.wards) ? data.wards : [];
         return (
           <div className="card">
             <div className="card-header"><div className="card-title">Ward Capacity Matrix</div></div>
@@ -1160,7 +1168,7 @@
               <table>
                 <thead><tr><th>Ward</th><th>Total Beds</th><th>Available</th><th>Occupied</th><th>Reserved</th><th>Dirty</th></tr></thead>
                 <tbody>
-                  {filterRows(data.wards, ['name']).map((w, idx) => (
+                  {filterRows(wardsList, ['name']).map((w, idx) => (
                     <tr key={idx} onClick={() => onSelectWard(w.name)} style={{ cursor: 'pointer' }} title="Click to view detailed bed occupation, patient vitals & visitor passes">
                       <td style={{ fontWeight: 700, color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>{w.name}</span>
@@ -1181,6 +1189,7 @@
       }
 
       if (tab === 'lab') {
+        const list = Array.isArray(data) ? data : [];
         return (
           <div className="card">
             <div className="card-header"><div className="card-title">Lab & Diagnostic Orders</div></div>
@@ -1188,7 +1197,7 @@
               <table>
                 <thead><tr><th>Order ID</th><th>Patient</th><th>Test Name</th><th>Priority</th><th>Flag</th><th>Result</th></tr></thead>
                 <tbody>
-                  {filterRows(data, ['patient', 'test']).map((l, idx) => (
+                  {filterRows(list, ['patient', 'test']).map((l, idx) => (
                     <tr key={idx}>
                       <td style={{ fontWeight: 700 }}>{l.order_id}</td>
                       <td style={{ fontWeight: 600 }}>{l.patient}</td>
@@ -1206,6 +1215,7 @@
       }
 
       if (tab === 'pharmacy') {
+        const list = Array.isArray(data) ? data : [];
         return (
           <div className="card">
             <div className="card-header"><div className="card-title">Pharmacy & Medication Inventory</div></div>
@@ -1213,7 +1223,7 @@
               <table>
                 <thead><tr><th>Code</th><th>Medication Name</th><th>Category</th><th>Current Stock</th><th>Status</th></tr></thead>
                 <tbody>
-                  {filterRows(data, ['name', 'category']).map((p, idx) => (
+                  {filterRows(list, ['name', 'category']).map((p, idx) => (
                     <tr key={idx}>
                       <td style={{ fontWeight: 700 }}>{p.code}</td>
                       <td style={{ fontWeight: 600 }}>{p.name}</td>
@@ -1230,12 +1240,14 @@
       }
 
       if (tab === 'billing') {
+        const summaryObj = (data && data.summary) || { total_billed: "₹14,50,000", total_collected: "₹11,20,000", pending_claims: "₹3,30,000" };
+        const claimsList = (data && Array.isArray(data.claims)) ? data.claims : [];
         return (
           <React.Fragment>
             <div className="stats-row">
-              <div className="stat-card"><div className="stat-label">Total Billed</div><div className="stat-value">{data.summary.total_billed}</div></div>
-              <div className="stat-card"><div className="stat-label">Total Collected</div><div className="stat-value">{data.summary.total_collected}</div></div>
-              <div className="stat-card"><div className="stat-label">Pending TPA Claims</div><div className="stat-value">{data.summary.pending_claims}</div></div>
+              <div className="stat-card"><div className="stat-label">Total Billed</div><div className="stat-value">{summaryObj.total_billed}</div></div>
+              <div className="stat-card"><div className="stat-label">Total Collected</div><div className="stat-value">{summaryObj.total_collected}</div></div>
+              <div className="stat-card"><div className="stat-label">Pending TPA Claims</div><div className="stat-value">{summaryObj.pending_claims}</div></div>
             </div>
             <div className="card">
               <div className="card-header"><div className="card-title">Insurance TPA Claims</div></div>
@@ -1243,7 +1255,7 @@
                 <table>
                   <thead><tr><th>Claim No</th><th>Patient</th><th>TPA Insurer</th><th>Amount</th><th>Status</th></tr></thead>
                   <tbody>
-                    {filterRows(data.claims, ['patient', 'tpa', 'claim_no']).map((c, idx) => (
+                    {filterRows(claimsList, ['patient', 'tpa', 'claim_no']).map((c, idx) => (
                       <tr key={idx}>
                         <td style={{ fontWeight: 700 }}>{c.claim_no}</td>
                         <td style={{ fontWeight: 600 }}>{c.patient}</td>
