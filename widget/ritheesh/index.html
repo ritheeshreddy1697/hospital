@@ -310,6 +310,26 @@
       const [viewData, setViewData] = useState(null);
       const [loadingView, setLoadingView] = useState(false);
 
+      // Ward Patient Details Modal State
+      const [selectedWardModal, setSelectedWardModal] = useState(null);
+      const [wardPatientData, setWardPatientData] = useState(null);
+      const [loadingWardModal, setLoadingWardModal] = useState(false);
+
+      const handleOpenWardModal = async (wardName) => {
+        setSelectedWardModal(wardName);
+        setLoadingWardModal(true);
+        setWardPatientData(null);
+        try {
+          const res = await fetch('/api/his/ward-patients/' + encodeURIComponent(wardName));
+          const data = await res.json();
+          setWardPatientData(data);
+          setLoadingWardModal(false);
+        } catch (err) {
+          console.error(err);
+          setLoadingWardModal(false);
+        }
+      };
+
       // Handle Login Form Submission
       const handleLogin = async (usr, pwd) => {
         const username = usr || loginUser;
@@ -691,6 +711,7 @@
                   searchQuery={searchQuery}
                   onProfileUpdate={(updated) => setUserProfile(updated)}
                   onSwitchTab={(t) => setCurrentTab(t)}
+                  onSelectWard={(w) => handleOpenWardModal(w)}
                 />
               )}
             </div>
@@ -879,13 +900,97 @@
                 />
               </div>
             </div>
+          {/* Ward Patient & Visitor Details Modal */}
+          {selectedWardModal && (
+            <div className="iframe-modal">
+              <div className="iframe-container" style={{ width: '92%', maxWidth: '1200px', height: '88vh', background: '#f8fafc' }}>
+                <div className="iframe-header" style={{ background: '#0f172a' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>🏥 Ward: {selectedWardModal} — Detailed Patient Bed Occupation, Clinical Vitals & Visitor Passes</span>
+                  </div>
+                  <button className="close-btn" onClick={() => setSelectedWardModal(null)}>&times;</button>
+                </div>
+
+                <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {loadingWardModal ? (
+                    <div style={{ textAlign: 'center', padding: '60px' }}>
+                      <span className="spinner"></span> Fetching patient bed occupation & visitor pass logs...
+                    </div>
+                  ) : (
+                    wardPatientData && wardPatientData.patients.map((p, pidx) => (
+                      <div key={pidx} className="card" style={{ marginBottom: '0', border: '1px solid #cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                        {/* Header Banner */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 800, background: '#2563eb', color: 'white', padding: '6px 14px', borderRadius: '8px', fontFamily: 'monospace' }}>
+                              🛏 Bed {p.bed}
+                            </span>
+                            <div>
+                              <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>{p.patient_name} <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>({p.age}y / {p.gender} · Blood: {p.blood_group})</span></h3>
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>UHID: <strong>{p.uhid}</strong> · Admitted: {p.admitted_date}</div>
+                            </div>
+                          </div>
+                          <div>
+                            <span className={`badge ${p.status === 'Critical' ? 'badge-red' : 'badge-green'}`} style={{ padding: '6px 14px', fontSize: '12px' }}>
+                              {p.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Patient Care Team & Medical Info Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+                          <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Attending Care Team</div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', marginTop: '4px' }}>👨‍⚕️ {p.doctor}</div>
+                            <div style={{ fontSize: '12px', color: '#475569' }}>👩‍⚕️ Lead Nurse: {p.nurse}</div>
+                          </div>
+
+                          <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Clinical Diagnosis & Live Vitals</div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#dc2626', marginTop: '4px' }}>📋 {p.diagnosis}</div>
+                            <div style={{ fontSize: '12px', color: '#334155', marginTop: '6px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                              <span><strong>BP:</strong> {p.vitals.bp}</span>
+                              <span><strong>HR:</strong> {p.vitals.heart_rate}</span>
+                              <span><strong>SpO2:</strong> {p.vitals.spo2}</span>
+                              <span><strong>Temp:</strong> {p.vitals.temp}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Visitor Details Card */}
+                        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>👨‍👩‍👧 Approved Visitor Logs & Security Gate Passes</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+                            {p.visitors && p.visitors.map((v, vidx) => (
+                              <div key={vidx} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 14px', borderRadius: '8px', fontSize: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <strong style={{ color: '#1e40af', fontSize: '13px' }}>👤 {v.name} ({v.relation})</strong>
+                                  <span className="badge badge-blue" style={{ fontSize: '10px' }}>{v.status}</span>
+                                </div>
+                                <div style={{ color: '#475569', marginTop: '4px' }}>📞 Phone: {v.phone}</div>
+                                <div style={{ color: '#475569', marginTop: '2px', display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>Pass ID: <strong>{v.pass_id}</strong></span>
+                                  <span>Slot: {v.slot}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </React.Fragment>
       );
     }
 
     // ── Dynamic React View Renderer Component ──
-    function ViewRenderer({ tab, data, searchQuery, onProfileUpdate, onSwitchTab }) {
+    function ViewRenderer({ tab, data, searchQuery, onProfileUpdate, onSwitchTab, onSelectWard }) {
       if (!data && tab !== 'profile') return null;
 
       const q = searchQuery.toLowerCase();
@@ -915,8 +1020,11 @@
                     <thead><tr><th>Ward</th><th>Available</th><th>Occupied</th><th>Reserved</th><th>Dirty</th></tr></thead>
                     <tbody>
                       {filterRows(data.wards, ['name']).map((w, idx) => (
-                        <tr key={idx}>
-                          <td style={{ fontWeight: 600 }}>{w.name}</td>
+                        <tr key={idx} onClick={() => onSelectWard(w.name)} style={{ cursor: 'pointer' }} title="Click to view detailed bed occupation, patient vitals & visitor passes">
+                          <td style={{ fontWeight: 700, color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{w.name}</span>
+                            <span style={{ fontSize: '11px', background: '#dbeafe', color: '#1d4ed8', padding: '2px 6px', borderRadius: '4px' }}>🔍 View Patients</span>
+                          </td>
                           <td><span className="badge badge-green">{w.available}</span></td>
                           <td><span className="badge badge-blue">{w.occupied}</span></td>
                           <td><span className="badge badge-yellow">{w.reserved}</span></td>
@@ -1051,8 +1159,11 @@
                 <thead><tr><th>Ward</th><th>Total Beds</th><th>Available</th><th>Occupied</th><th>Reserved</th><th>Dirty</th></tr></thead>
                 <tbody>
                   {filterRows(data.wards, ['name']).map((w, idx) => (
-                    <tr key={idx}>
-                      <td style={{ fontWeight: 700 }}>{w.name}</td>
+                    <tr key={idx} onClick={() => onSelectWard(w.name)} style={{ cursor: 'pointer' }} title="Click to view detailed bed occupation, patient vitals & visitor passes">
+                      <td style={{ fontWeight: 700, color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{w.name}</span>
+                        <span style={{ fontSize: '11px', background: '#dbeafe', color: '#1d4ed8', padding: '2px 6px', borderRadius: '4px' }}>🔍 View Patient Details & Visitors</span>
+                      </td>
                       <td>{w.total}</td>
                       <td><span className="badge badge-green">{w.available}</span></td>
                       <td><span className="badge badge-blue">{w.occupied}</span></td>

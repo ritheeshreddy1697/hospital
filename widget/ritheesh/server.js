@@ -443,6 +443,103 @@ app.get('/api/his/reports', (req, res) => {
   });
 });
 
+// 8. Ward Patient & Visitor Details Endpoint
+app.get('/api/his/ward-patients/:wardName', (req, res) => {
+  const ward = req.params.wardName;
+  const wardDataMap = {
+    'ICU': [
+      {
+        bed: "ICU-101",
+        patient_name: "Rajesh Kumar",
+        uhid: "UHID-9821",
+        age: 54, gender: "Male", blood_group: "O+",
+        admitted_date: "2026-08-11 04:30 PM",
+        doctor: "Dr. Neha Sharma",
+        nurse: "Sr. Anitha Roy",
+        diagnosis: "Acute Respiratory Failure & Septic Shock",
+        status: "Critical",
+        vitals: { bp: "110/70 mmHg", heart_rate: "98 bpm", spo2: "94% (Ventilated)", temp: "99.1°F" },
+        visitors: [
+          { name: "Sunil Kumar", relation: "Brother", phone: "+91 98123 45678", pass_id: "VP-901", status: "Checked In", slot: "04:00 PM - 06:00 PM" },
+          { name: "Meena Kumar", relation: "Wife", phone: "+91 98123 45679", pass_id: "VP-902", status: "Checked Out", slot: "11:00 AM - 01:00 PM" }
+        ]
+      },
+      {
+        bed: "ICU-104",
+        patient_name: "Priya Das",
+        uhid: "UHID-9844",
+        age: 38, gender: "Female", blood_group: "B+",
+        admitted_date: "2026-08-12 10:15 AM",
+        doctor: "Dr. Arjun Patel",
+        nurse: "Sr. Kavita Nair",
+        diagnosis: "Post-op Cardiac Bypass Observation",
+        status: "Under Observation",
+        vitals: { bp: "124/82 mmHg", heart_rate: "76 bpm", spo2: "98%", temp: "98.6°F" },
+        visitors: [
+          { name: "Ramesh Das", relation: "Husband", phone: "+91 98456 12345", pass_id: "VP-905", status: "Checked In", slot: "04:00 PM - 06:00 PM" }
+        ]
+      }
+    ],
+    'General Ward': [
+      {
+        bed: "GW-204",
+        patient_name: "Ananya Roy",
+        uhid: "UHID-9822",
+        age: 32, gender: "Female", blood_group: "A+",
+        admitted_date: "2026-08-10 02:00 PM",
+        doctor: "Dr. Arjun Patel",
+        nurse: "Sr. Mary Joseph",
+        diagnosis: "Dengue Fever with Thrombocytopenia",
+        status: "Improving",
+        vitals: { bp: "118/78 mmHg", heart_rate: "72 bpm", spo2: "99%", temp: "98.4°F" },
+        visitors: [
+          { name: "Debashish Roy", relation: "Father", phone: "+91 98765 11223", pass_id: "VP-701", status: "Checked In", slot: "04:00 PM - 07:00 PM" }
+        ]
+      }
+    ],
+    'Emergency': [
+      {
+        bed: "ER-01",
+        patient_name: "Amit Shah",
+        uhid: "UHID-9901",
+        age: 45, gender: "Male", blood_group: "AB+",
+        admitted_date: "2026-08-13 11:10 AM",
+        doctor: "Dr. Neha Sharma",
+        nurse: "Sr. Rajeshwari",
+        diagnosis: "Acute Coronary Syndrome / STEMI",
+        status: "Critical",
+        vitals: { bp: "145/95 mmHg", heart_rate: "110 bpm", spo2: "95%", temp: "98.8°F" },
+        visitors: [
+          { name: "Rekha Shah", relation: "Wife", phone: "+91 98999 44332", pass_id: "VP-101", status: "Waiting Room", slot: "Immediate" }
+        ]
+      }
+    ]
+  };
+
+  const defaultList = [
+    {
+      bed: `${ward}-01`,
+      patient_name: "Vikram Singh",
+      uhid: "UHID-9823",
+      age: 48, gender: "Male", blood_group: "O-",
+      admitted_date: "2026-08-12 01:00 PM",
+      doctor: "Dr. Meera Iyer",
+      nurse: "Sr. Grace Mathew",
+      diagnosis: "Post-operative Care & Rehabilitation",
+      status: "Stable",
+      vitals: { bp: "120/80 mmHg", heart_rate: "75 bpm", spo2: "98%", temp: "98.6°F" },
+      visitors: [
+        { name: "Rohit Singh", relation: "Son", phone: "+91 98111 55667", pass_id: "VP-401", status: "Checked In", slot: "04:00 PM - 06:00 PM" }
+      ]
+    }
+  ];
+
+  res.json({
+    ward: ward,
+    patients: wardDataMap[ward] || defaultList
+  });
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
