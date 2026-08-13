@@ -3,11 +3,25 @@ import os
 import re
 import json
 
+# Safe .env reader fallback
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(env_path):
+    try:
+        with open(env_path) as f:
+            for line in f:
+                if line.strip() and not line.startswith('#') and '=' in line:
+                    k, v = line.strip().split('=', 1)
+                    os.environ.setdefault(k, v)
+    except Exception as e:
+        print("Env load info:", e)
+
 DB_FILE = os.path.join(os.path.dirname(__file__), "hospilot.db")
+CHATBOT_API_KEY = os.getenv("CHATBOT_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("HOSPILOT_CHATBOT_KEY")
 
 class HospilotRAGEngine:
-    def __init__(self, db_path=DB_FILE):
+    def __init__(self, db_path=DB_FILE, api_key=CHATBOT_API_KEY):
         self.db_path = db_path
+        self.api_key = api_key
 
     def get_connection(self):
         return sqlite3.connect(self.db_path)
