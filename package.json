@@ -1,0 +1,16 @@
+{
+  "name": "hospilot-hospital-platform",
+  "version": "1.0.0",
+  "description": "CarePlus Hospital HIS Platform & Hospilot AI Widget",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node widget/ritheesh/server.js",
+    "dev": "node widget/ritheesh/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5"
+  }
+}
